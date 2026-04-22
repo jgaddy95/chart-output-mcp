@@ -1,0 +1,67 @@
+{
+  "type": "bar",
+  "brandKitId": "obsidian",
+  "width": 1200,
+  "height": 900,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0d1117",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "FY REVENUE",
+    "title": "Quarterly revenue",
+    "subtitle": "Q1–Q4 (thousands)",
+    "badge": {
+      "text": "Dark theme",
+      "backgroundColor": "rgba(88,166,255,0.12)",
+      "color": "#58a6ff",
+      "borderRadius": 6
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "square",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f0f6fc", "textSecondary": "#6e7681" },
+  "data": {
+    "labels": ["Q1", "Q2", "Q3", "Q4"],
+    "datasets": [
+      {
+        "label": "Revenue ($k)",
+        "data": [42, 58, 71, 89],
+        "backgroundColor": "rgba(88,166,255,0.75)",
+        "borderColor": "#58a6ff",
+        "borderWidth": 0,
+        "borderRadius": 6
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.05)" },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "Total revenue", "value": "$260k", "color": "#f0f6fc" },
+    { "label": "Growth", "value": "34%", "color": "#6ee7b7" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "Q1–Q4 revenue",
+    "borderTop": true
+  }
+}

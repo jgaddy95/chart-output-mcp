@@ -8,7 +8,7 @@ const API_BASE = "https://www.chart-output.com";
 const apiKey = process.env.CHART_OUTPUT_API_KEY ?? null;
 const server = new McpServer({
     name: "chart-output-mcp",
-    version: "1.0.0",
+    version: "1.0.2",
 });
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function authHeaders() {
@@ -26,6 +26,36 @@ function chartOutputHttpError(status, body, statusText) {
         return new Error(`Chart-Output error 401: ${msg}. Set CHART_OUTPUT_API_KEY to your API key and use Authorization: Bearer (see https://www.chart-output.com/docs/quick-start).`);
     }
     return new Error(`Chart-Output error ${status}: ${msg}`);
+}
+const extensionsSchema = z
+    .record(z.unknown())
+    .optional()
+    .describe("Optional Chart-Output dashboard fields merged first, then overridden by type/labels/datasets/width/height/format. Use for backgroundColor, kpiStrip, header, footer, theme, brandKitId, borderRadius, legend, options (partial), etc.");
+function buildChartRenderBody(args) {
+    const { extensions, type, labels, datasets, width, height, format, title, returnUrl } = args;
+    const body = {
+        ...(extensions ?? {}),
+        type,
+        width,
+        height,
+        format,
+        data: { labels, datasets },
+    };
+    if (returnUrl) {
+        body.returnUrl = true;
+    }
+    if (title) {
+        const opts = body.options ?? {};
+        const plugins = opts.plugins ?? {};
+        body.options = {
+            ...opts,
+            plugins: {
+                ...plugins,
+                title: { display: true, text: title },
+            },
+        };
+    }
+    return body;
 }
 function assertChartImageBuffer(buffer, format) {
     const headUtf8 = buffer
@@ -112,7 +142,7 @@ async function fetchChartAsBase64(body) {
 }
 // ─── Tool 1: render_chart ─────────────────────────────────────────────────────
 // Takes a full Chart.js-style JSON spec, returns inline image
-server.tool("render_chart", "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types.", {
+server.tool("render_chart", "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types. Pass optional extensions for Chart-Output dashboard features (dark background, kpiStrip, header, theme).", {
     type: z
         .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
         .describe("Chart type"),
@@ -132,17 +162,18 @@ server.tool("render_chart", "Render a chart from a Chart.js JSON specification. 
     height: z.number().min(100).max(2000).default(400).optional(),
     title: z.string().optional().describe("Chart title"),
     format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
-}, async ({ type, labels, datasets, width, height, title, format }) => {
-    const body = {
+    extensions: extensionsSchema,
+}, async ({ type, labels, datasets, width, height, title, format, extensions }) => {
+    const body = buildChartRenderBody({
+        extensions,
         type,
+        labels,
+        datasets,
         width: width ?? 800,
         height: height ?? 400,
         format: format ?? "png",
-        data: { labels, datasets },
-    };
-    if (title) {
-        body.options = { plugins: { title: { display: true, text: title } } };
-    }
+        title,
+    });
     const { base64, mimeType } = await fetchChartAsBase64(body);
     return {
         content: [
@@ -174,18 +205,19 @@ server.tool("render_chart_url", "Render a chart and return a CDN URL instead of 
     height: z.number().min(100).max(2000).default(400).optional(),
     title: z.string().optional(),
     format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
-}, async ({ type, labels, datasets, width, height, title, format }) => {
-    const body = {
+    extensions: extensionsSchema,
+}, async ({ type, labels, datasets, width, height, title, format, extensions }) => {
+    const body = buildChartRenderBody({
+        extensions,
         type,
+        labels,
+        datasets,
         width: width ?? 800,
         height: height ?? 400,
         format: format ?? "png",
+        title,
         returnUrl: true,
-        data: { labels, datasets },
-    };
-    if (title) {
-        body.options = { plugins: { title: { display: true, text: title } } };
-    }
+    });
     const res = await fetch(`${API_BASE}/api/v1/render`, {
         method: "POST",
         redirect: "follow",
@@ -206,7 +238,36 @@ server.tool("render_chart_url", "Render a chart and return a CDN URL instead of 
         ],
     };
 });
-// ─── Tool 3: render_chart_ai ──────────────────────────────────────────────────
+// ─── Tool 3: render_card ────────────────────────────────────────────────────
+// Full card composition POST body — passes through to /api/v1/render unchanged.
+server.tool("render_card", "Render a full branded card composition: header (eyebrow, title, subtitle, badge), KPI strip, footer, theme, border, padding, backgroundColor, brandKitId, and chart data/options. Sends the spec verbatim to Chart-Output — use this for production layouts; use render_chart only for simple Chart.js-only payloads. See https://www.chart-output.com/docs/card-composition and examples/*.json in this package.", {
+    spec: z
+        .record(z.unknown())
+        .describe("Full card composition JSON for POST /api/v1/render. See https://www.chart-output.com/docs/card-composition (header, kpiStrip, footer, backgroundColor, theme, border, padding, data, options, etc.)."),
+}, async ({ spec }) => {
+    const body = spec;
+    if (body.returnUrl === true) {
+        throw new Error("render_card only returns inline images. Omit returnUrl from the spec for binary responses.");
+    }
+    const { base64, mimeType } = await fetchChartAsBase64(body);
+    const w = typeof body.width === "number" ? body.width : "?";
+    const h = typeof body.height === "number" ? body.height : "?";
+    const fmt = typeof body.format === "string" ? body.format : "png";
+    return {
+        content: [
+            {
+                type: "image",
+                data: base64,
+                mimeType,
+            },
+            {
+                type: "text",
+                text: `Card rendered successfully (${w}×${h} ${fmt}).`,
+            },
+        ],
+    };
+});
+// ─── Tool 4: render_chart_ai ──────────────────────────────────────────────────
 // Natural language → chart. Requires Pro/Business API key.
 server.tool("render_chart_ai", "Generate a chart from a natural language description and optional raw data. Chart-Output's AI layer builds the chart spec automatically. Requires a Pro or Business API key.", {
     description: z

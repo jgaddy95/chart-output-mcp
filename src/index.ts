@@ -10,7 +10,7 @@ const apiKey = process.env.CHART_OUTPUT_API_KEY ?? null;
 
 const server = new McpServer({
   name: "chart-output-mcp",
-  version: "1.0.0",
+  version: "1.0.2",
 });
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -38,6 +38,51 @@ function chartOutputHttpError(
     );
   }
   return new Error(`Chart-Output error ${status}: ${msg}`);
+}
+
+const extensionsSchema = z
+  .record(z.unknown())
+  .optional()
+  .describe(
+    "Optional Chart-Output dashboard fields merged first, then overridden by type/labels/datasets/width/height/format. Use for backgroundColor, kpiStrip, header, footer, theme, brandKitId, borderRadius, legend, options (partial), etc."
+  );
+
+function buildChartRenderBody(args: {
+  extensions?: Record<string, unknown>;
+  type: string;
+  labels: string[];
+  datasets: unknown[];
+  width: number;
+  height: number;
+  format: string;
+  title?: string;
+  returnUrl?: boolean;
+}): Record<string, unknown> {
+  const { extensions, type, labels, datasets, width, height, format, title, returnUrl } =
+    args;
+  const body: Record<string, unknown> = {
+    ...(extensions ?? {}),
+    type,
+    width,
+    height,
+    format,
+    data: { labels, datasets },
+  };
+  if (returnUrl) {
+    body.returnUrl = true;
+  }
+  if (title) {
+    const opts = (body.options as Record<string, unknown> | undefined) ?? {};
+    const plugins = (opts.plugins as Record<string, unknown> | undefined) ?? {};
+    body.options = {
+      ...opts,
+      plugins: {
+        ...plugins,
+        title: { display: true, text: title },
+      },
+    };
+  }
+  return body;
 }
 
 function assertChartImageBuffer(
@@ -155,7 +200,7 @@ async function fetchChartAsBase64(
 
 server.tool(
   "render_chart",
-  "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types.",
+  "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types. Pass optional extensions for Chart-Output dashboard features (dark background, kpiStrip, header, theme).",
   {
     type: z
       .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
@@ -178,19 +223,19 @@ server.tool(
     height: z.number().min(100).max(2000).default(400).optional(),
     title: z.string().optional().describe("Chart title"),
     format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
+    extensions: extensionsSchema,
   },
-  async ({ type, labels, datasets, width, height, title, format }) => {
-    const body: Record<string, unknown> = {
+  async ({ type, labels, datasets, width, height, title, format, extensions }) => {
+    const body = buildChartRenderBody({
+      extensions,
       type,
+      labels,
+      datasets,
       width: width ?? 800,
       height: height ?? 400,
       format: format ?? "png",
-      data: { labels, datasets },
-    };
-
-    if (title) {
-      body.options = { plugins: { title: { display: true, text: title } } };
-    }
+      title,
+    });
 
     const { base64, mimeType } = await fetchChartAsBase64(body);
 
@@ -232,20 +277,20 @@ server.tool(
     height: z.number().min(100).max(2000).default(400).optional(),
     title: z.string().optional(),
     format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
+    extensions: extensionsSchema,
   },
-  async ({ type, labels, datasets, width, height, title, format }) => {
-    const body: Record<string, unknown> = {
+  async ({ type, labels, datasets, width, height, title, format, extensions }) => {
+    const body = buildChartRenderBody({
+      extensions,
       type,
+      labels,
+      datasets,
       width: width ?? 800,
       height: height ?? 400,
       format: format ?? "png",
+      title,
       returnUrl: true,
-      data: { labels, datasets },
-    };
-
-    if (title) {
-      body.options = { plugins: { title: { display: true, text: title } } };
-    }
+    });
 
     const res = await fetch(`${API_BASE}/api/v1/render`, {
       method: "POST",
@@ -272,7 +317,47 @@ server.tool(
   }
 );
 
-// ─── Tool 3: render_chart_ai ──────────────────────────────────────────────────
+// ─── Tool 3: render_card ────────────────────────────────────────────────────
+// Full card composition POST body — passes through to /api/v1/render unchanged.
+
+server.tool(
+  "render_card",
+  "Render a full branded card composition: header (eyebrow, title, subtitle, badge), KPI strip, footer, theme, border, padding, backgroundColor, brandKitId, and chart data/options. Sends the spec verbatim to Chart-Output — use this for production layouts; use render_chart only for simple Chart.js-only payloads. See https://www.chart-output.com/docs/card-composition and examples/*.json in this package.",
+  {
+    spec: z
+      .record(z.unknown())
+      .describe(
+        "Full card composition JSON for POST /api/v1/render. See https://www.chart-output.com/docs/card-composition (header, kpiStrip, footer, backgroundColor, theme, border, padding, data, options, etc.)."
+      ),
+  },
+  async ({ spec }) => {
+    const body = spec as Record<string, unknown>;
+    if (body.returnUrl === true) {
+      throw new Error(
+        "render_card only returns inline images. Omit returnUrl from the spec for binary responses."
+      );
+    }
+    const { base64, mimeType } = await fetchChartAsBase64(body);
+    const w = typeof body.width === "number" ? body.width : "?";
+    const h = typeof body.height === "number" ? body.height : "?";
+    const fmt = typeof body.format === "string" ? body.format : "png";
+    return {
+      content: [
+        {
+          type: "image" as const,
+          data: base64,
+          mimeType,
+        },
+        {
+          type: "text" as const,
+          text: `Card rendered successfully (${w}×${h} ${fmt}).`,
+        },
+      ],
+    };
+  }
+);
+
+// ─── Tool 4: render_chart_ai ──────────────────────────────────────────────────
 // Natural language → chart. Requires Pro/Business API key.
 
 server.tool(

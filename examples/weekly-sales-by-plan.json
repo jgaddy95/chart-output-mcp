@@ -1,0 +1,75 @@
+{
+  "type": "bar",
+  "brandKitId": "obsidian",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0f0a1e",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "title": "Weekly Sales by Plan",
+    "subtitle": "Last 4 weeks · all regions"
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "square",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f3f4f6", "textSecondary": "#9ca3af" },
+  "data": {
+    "labels": ["W1", "W2", "W3", "W4"],
+    "datasets": [
+      {
+        "label": "Enterprise",
+        "data": [42, 58, 71, 89],
+        "backgroundColor": "#6366f1",
+        "borderWidth": 0,
+        "borderRadius": 8
+      },
+      {
+        "label": "Pro",
+        "data": [28, 34, 41, 52],
+        "backgroundColor": "#10b981",
+        "borderWidth": 0,
+        "borderRadius": 8
+      },
+      {
+        "label": "Starter",
+        "data": [12, 15, 18, 22],
+        "backgroundColor": "#f59e0b",
+        "borderWidth": 0,
+        "borderRadius": 8
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#9ca3af" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.06)" },
+        "border": { "display": false },
+        "ticks": { "color": "#9ca3af" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "Total MRR", "value": "$291k", "color": "#f3f4f6" },
+    { "label": "Best Week", "value": "W4", "color": "#a5b4fc" },
+    { "label": "Growth", "value": "34%", "color": "#6ee7b7" },
+    { "label": "Avg Deal", "value": "$4.2k", "color": "#fcd34d" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "Weekly sales by plan",
+    "borderTop": true
+  }
+}

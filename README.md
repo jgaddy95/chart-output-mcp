@@ -42,8 +42,9 @@ Get a free API key at [chart-output.com](https://www.chart-output.com/auth/sign-
 
 | Tool | Description |
 |------|-------------|
-| `render_chart` | Chart.js spec → inline image in your AI chat |
-| `render_chart_url` | Chart.js spec → CDN URL for embedding in email or HTML |
+| `render_chart` | Chart.js-style labels/datasets → inline image (optional `extensions` for partial dashboard fields) |
+| `render_chart_url` | Same as `render_chart` → CDN URL instead of bytes |
+| `render_card` | **Full card composition** JSON → inline image (header, KPI strip, footer, theme, `backgroundColor`, etc.); spec is POSTed verbatim to `/api/v1/render` |
 | `render_chart_ai` | Natural language + data → image (Pro/Business key required) |
 
 ## Example
@@ -53,8 +54,8 @@ Once installed, just ask your AI agent:
 > "Create a line chart showing monthly active users growing from 
 > 12k in January to 28k in December"
 
-The agent calls `render_chart` or `render_chart_ai` and returns 
-the image directly in chat. No code required.
+The agent calls `render_chart`, `render_card`, or `render_chart_ai` and returns 
+the image directly in chat. No code required. Use **`render_card`** for branded dashboard layouts (dark theme, KPI row, footer).
 
 ## API Key
 
