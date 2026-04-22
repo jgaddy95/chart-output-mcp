@@ -1,17 +1,12 @@
 # Chart-Output MCP Server
 
-Render Chart.js configs to PNG, SVG, WebP, or JPEG images from any
-MCP-compatible AI agent — Claude, Cursor, Windsurf, and more.
+Render charts as PNG, SVG, or WebP images directly from Claude, Cursor, 
+Windsurf, or any MCP-compatible AI agent.
 
-## Tools
+Ask your AI: *"Generate a bar chart showing Q1–Q4 revenue"* — it calls 
+Chart-Output and returns the image inline.
 
-- `render_chart` — Chart.js spec → inline image
-- `render_chart_url` — Chart.js spec → CDN URL (for email/HTML embedding)
-- `render_chart_ai` — Natural language + data → image (Pro/Business key required)
-
-## Setup
-
-### Claude Desktop / Cursor / Windsurf
+## Install
 
 Add to your `mcp.json`:
 
@@ -29,10 +24,37 @@ Add to your `mcp.json`:
 }
 ```
 
-**An API key is required.** Without `CHART_OUTPUT_API_KEY`, the API responds with JSON errors (for example `Missing API key`). If you save that response to a `.png` file, previews will fail—it is not image bytes.
+Get a free API key at [chart-output.com](https://www.chart-output.com/auth/sign-up) 
+— no credit card required.
 
-Use `Authorization: Bearer <key>` as described in the [Quick Start](https://www.chart-output.com/docs/quick-start). Your dashboard provides `pk_test_…` (development) and `pk_live_…` (production) keys.
+## Tools
 
-## Get an API Key
+| Tool | Description |
+|------|-------------|
+| `render_chart` | Chart.js spec → inline image in your AI chat |
+| `render_chart_url` | Chart.js spec → CDN URL for embedding in email or HTML |
+| `render_chart_ai` | Natural language + data → image (Pro/Business key required) |
 
-Sign up → API Keys → Create key. See [Quick Start](https://www.chart-output.com/docs/quick-start) for the exact request shape and headers.
+## Example
+
+Once installed, just ask your AI agent:
+
+> "Create a line chart showing monthly active users growing from 
+> 12k in January to 28k in December"
+
+The agent calls `render_chart` or `render_chart_ai` and returns 
+the image directly in chat. No code required.
+
+## API Key
+
+1. Sign up at [chart-output.com](https://www.chart-output.com/auth/sign-up)
+2. Go to Dashboard → API Keys → Create key
+3. Add it to your `mcp.json` as shown above
+
+Free trial includes 500 renders. No credit card required.
+
+## Links
+
+- [Chart-Output docs](https://www.chart-output.com/docs)
+- [npm package](https://www.npmjs.com/package/@chartoutput/mcp)
+- [Chart-Output pricing](https://www.chart-output.com/pricing)
