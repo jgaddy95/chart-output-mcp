@@ -304,6 +304,19 @@ function registerTools(server) {
         };
     });
 }
+const SERVER_INSTRUCTIONS = `You are using Chart-Output MCP to render charts and dashboard cards as images (PNG, JPEG, WebP, or SVG).
+
+Authentication: Rendering requires CHART_OUTPUT_API_KEY (Bearer). If calls fail with 401, the user must set the key on the MCP server.
+
+Choose the right tool:
+- render_chart — Simple Chart.js charts: chart type, labels, datasets, optional title/size/format. Use optional "extensions" to merge Chart-Output dashboard fields (e.g. backgroundColor, header, footer, kpiStrip, theme) without building a full card by hand.
+- render_chart_url — Same inputs as render_chart but returns a CDN URL instead of image bytes.
+- render_card — Full card composition: pass a single "spec" object that is POSTed verbatim to Chart-Output (header, kpiStrip, footer, theme, brandKitId, data, options, dimensions, format, etc.). Prefer this for production layouts, branding, and complex configs. Do not set returnUrl on the spec (inline image only).
+- render_chart_ai — Natural-language chart generation; requires a Pro or Business API key.
+
+Authoring JSON: For card-level or complex specs, mirror the shapes in the package examples directory (examples/*.json) and the card composition docs at https://www.chart-output.com/docs/card-composition
+
+Use clear labels and sensible dimensions (defaults are 800×400 unless the design needs otherwise).`;
 let warnedMissingApiKey = false;
 export function createServer() {
     if (!apiKey && !warnedMissingApiKey) {
@@ -312,8 +325,8 @@ export function createServer() {
     }
     const server = new McpServer({
         name: "chart-output-mcp",
-        version: "1.0.2",
-    });
+        version: "1.0.3",
+    }, { instructions: SERVER_INSTRUCTIONS });
     registerTools(server);
     return server;
 }
