@@ -6,6 +6,16 @@ Windsurf, or any MCP-compatible AI agent.
 Ask your AI: *"Generate a bar chart showing Q1–Q4 revenue"* — it calls 
 Chart-Output and returns the image inline.
 
+## What it produces
+
+Ask your AI agent to generate a chart. This is what comes back.
+
+![Campaign Performance](assets/campaign-performance.png)
+
+![MRR Breakdown](assets/mrr-breakdown.png)
+
+![API Analytics](assets/api-analytics.png)
+
 ## Install
 
 Add to your `mcp.json`:
