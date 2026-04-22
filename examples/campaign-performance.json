@@ -1,0 +1,71 @@
+{
+  "type": "bar",
+  "brandKitId": "studio",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0f172a",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "PAID MEDIA",
+    "title": "Performance by channel",
+    "subtitle": "Spend vs revenue · last 30 days",
+    "badge": {
+      "text": "Live",
+      "backgroundColor": "rgba(34,211,238,0.12)",
+      "color": "#22d3ee",
+      "borderRadius": 6
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "square",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f8fafc", "textSecondary": "#94a3b8", "mode": "dark" },
+  "data": {
+    "labels": ["Search", "Social", "Display", "Video", "Partner"],
+    "datasets": [
+      {
+        "label": "Spend ($k)",
+        "data": [48, 41, 23, 17, 12],
+        "backgroundColor": "rgba(56,189,248,0.7)",
+        "borderRadius": 4
+      },
+      {
+        "label": "Revenue ($k)",
+        "data": [156, 122, 58, 51, 39],
+        "backgroundColor": "rgba(52,211,153,0.7)",
+        "borderRadius": 4
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "ticks": { "color": "#94a3b8" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.06)" },
+        "ticks": { "color": "#94a3b8" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "ROAS", "value": "4.2x", "color": "#f8fafc" },
+    { "label": "CPA", "value": "$43", "color": "#f8fafc" },
+    { "label": "CTR", "value": "2.1%", "color": "#34d399" },
+    { "label": "Conv.", "value": "3.1k", "color": "#f8fafc" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "Campaign performance example",
+    "borderTop": true
+  }
+}

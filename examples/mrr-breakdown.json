@@ -1,0 +1,84 @@
+{
+  "type": "line",
+  "brandKitId": "obsidian",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0d1117",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "MONTHLY RECURRING REVENUE",
+    "title": "$29,840",
+    "subtitle": "↑ 16% from last month",
+    "badge": {
+      "text": "On track",
+      "backgroundColor": "rgba(110,231,183,0.12)",
+      "color": "#6ee7b7",
+      "borderRadius": 6
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "line",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f0f6fc", "textSecondary": "#6e7681" },
+  "data": {
+    "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    "datasets": [
+      {
+        "label": "MRR",
+        "data": [14200, 17800, 20100, 22900, 25720, 29840],
+        "borderColor": "#6ee7b7",
+        "backgroundColor": "rgba(110,231,183,0.07)",
+        "fill": true,
+        "tension": 0.45,
+        "borderWidth": 2.5,
+        "pointRadius": [0, 0, 0, 0, 0, 5],
+        "pointBackgroundColor": "#ffffff",
+        "pointBorderColor": "#6ee7b7",
+        "pointBorderWidth": 2.5
+      },
+      {
+        "label": "Target",
+        "data": [15000, 18500, 21000, 24000, 27000, 30000],
+        "borderColor": "rgba(255,255,255,0.2)",
+        "fill": false,
+        "tension": 0.45,
+        "borderWidth": 1.5,
+        "borderDash": [5, 4],
+        "pointRadius": 0
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.05)" },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "Customers", "value": "312", "color": "#f0f6fc" },
+    { "label": "ARPU", "value": "$95.70", "color": "#f0f6fc" },
+    { "label": "Churn", "value": "3.2%", "color": "#f59e0b" },
+    { "label": "LTV", "value": "$2,990", "color": "#f0f6fc" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "MRR breakdown example",
+    "borderTop": true
+  }
+}

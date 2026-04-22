@@ -12,6 +12,11 @@ Ask your AI agent to generate a chart. This is what comes back.
 
 <img src="assets/mrr-breakdown.png" alt="MRR breakdown chart example" width="480" />
 
+## Examples
+
+Ready-to-use chart configs in [`/examples`](./examples).
+Copy any file, swap in your data, POST to the API.
+
 ## Install
 
 Add to your `mcp.json`:

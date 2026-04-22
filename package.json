@@ -8,7 +8,8 @@
     "chart-output-mcp": "build/index.js"
   },
   "files": [
-    "build"
+    "build",
+    "examples"
   ],
   "keywords": [
     "mcp",

@@ -1,0 +1,81 @@
+{
+  "type": "line",
+  "brandKitId": "obsidian",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0d1117",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "API",
+    "title": "Request volume & health",
+    "subtitle": "Rolling 7 days",
+    "badge": {
+      "text": "99.95% up",
+      "backgroundColor": "rgba(110,231,183,0.12)",
+      "color": "#6ee7b7",
+      "borderRadius": 6
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "line",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f0f6fc", "textSecondary": "#6e7681" },
+  "data": {
+    "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "datasets": [
+      {
+        "label": "Requests (k)",
+        "data": [820, 910, 880, 940, 890, 760, 730],
+        "borderColor": "#58a6ff",
+        "backgroundColor": "rgba(88,166,255,0.08)",
+        "fill": true,
+        "tension": 0.35,
+        "borderWidth": 2.5,
+        "pointRadius": 3
+      },
+      {
+        "label": "4xx/5xx (k)",
+        "data": [4.2, 3.8, 5.1, 3.2, 4.0, 2.9, 2.7],
+        "borderColor": "#f85149",
+        "backgroundColor": "transparent",
+        "fill": false,
+        "tension": 0.35,
+        "borderWidth": 2,
+        "pointRadius": 3
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.05)" },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "p50 latency", "value": "42ms", "color": "#f0f6fc" },
+    { "label": "p99 latency", "value": "186ms", "color": "#f0f6fc" },
+    { "label": "Error rate", "value": "0.44%", "color": "#f85149" },
+    { "label": "Quota", "value": "72%", "color": "#f0f6fc" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "API analytics example",
+    "borderTop": true
+  }
+}
