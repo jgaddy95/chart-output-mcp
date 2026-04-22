@@ -10,11 +10,7 @@ Chart-Output and returns the image inline.
 
 Ask your AI agent to generate a chart. This is what comes back.
 
-![Campaign Performance](assets/campaign-performance.png)
-
-![MRR Breakdown](assets/mrr-breakdown.png)
-
-![API Analytics](assets/api-analytics.png)
+<img src="assets/mrr-breakdown.png" alt="MRR breakdown chart example" width="480" />
 
 ## Install
 
