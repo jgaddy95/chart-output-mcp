@@ -1,0 +1,96 @@
+{
+  "type": "line",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#ffffff",
+  "borderRadius": 16,
+  "border": { "color": "rgba(15, 23, 42, 0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "MARKETS",
+    "title": "S&P 500 long-term growth",
+    "subtitle": "40 years · year-end index (^GSPC) · price level (excludes dividends)",
+    "badge": {
+      "text": "~8.9% CAGR",
+      "backgroundColor": "rgba(16, 185, 129, 0.12)",
+      "color": "#047857",
+      "borderRadius": 8
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "line",
+    "fontSize": 11,
+    "gap": 28
+  },
+  "theme": { "textPrimary": "#0f172a", "textSecondary": "#64748b" },
+  "data": {
+    "labels": [
+      "1985", "1986", "1987", "1988", "1989", "1990", "1991", "1992", "1993", "1994",
+      "1995", "1996", "1997", "1998", "1999", "2000", "2001", "2002", "2003", "2004",
+      "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014",
+      "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"
+    ],
+    "datasets": [
+      {
+        "label": "S&P 500 (actual)",
+        "data": [
+          211.28, 242.17, 247.08, 277.72, 353.4, 330.22, 417.09, 435.71, 466.45, 459.27,
+          615.93, 740.74, 970.43, 1229.23, 1469.25, 1320.28, 1148.08, 879.82, 1111.92, 1211.92,
+          1248.29, 1418.3, 1468.36, 903.25, 1115.1, 1257.64, 1257.6, 1426.19, 1848.36, 2058.9,
+          2043.94, 2238.83, 2673.61, 2506.85, 3230.78, 3756.07, 4766.18, 3839.5, 4769.83, 5881.63
+        ],
+        "borderColor": "#4f46e5",
+        "backgroundColor": "rgba(79, 70, 229, 0.08)",
+        "fill": true,
+        "tension": 0.35,
+        "borderWidth": 2.5,
+        "pointRadius": 0
+      },
+      {
+        "label": "Same-period CAGR path",
+        "data": [
+          211.28, 230.09, 250.58, 272.89, 297.18, 323.64, 352.46, 383.84, 418.02, 455.24,
+          495.77, 539.91, 587.98, 640.33, 697.34, 759.43, 827.05, 900.69, 980.88, 1068.21,
+          1163.32, 1266.9, 1379.7, 1502.54, 1636.32, 1782.01, 1940.67, 2113.46, 2301.63, 2506.56,
+          2729.73, 2972.77, 3237.45, 3525.7, 3839.61, 4181.48, 4553.78, 4959.22, 5400.77, 5881.63
+        ],
+        "borderColor": "rgba(15, 23, 42, 0.35)",
+        "backgroundColor": "transparent",
+        "fill": false,
+        "tension": 0.35,
+        "borderWidth": 1.5,
+        "borderDash": [6, 4],
+        "pointRadius": 0
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#94a3b8", "maxRotation": 45, "autoSkip": true, "maxTicksLimit": 12 }
+      },
+      "y": {
+        "grid": { "color": "rgba(15, 23, 42, 0.06)" },
+        "border": { "display": false },
+        "ticks": { "color": "#94a3b8" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "1985 close", "value": "211", "color": "#0f172a" },
+    { "label": "2024 close", "value": "5,882", "color": "#4f46e5" },
+    { "label": "40Y multiple", "value": "27.8×", "color": "#0f172a" },
+    { "label": "CAGR (approx.)", "value": "8.9%", "color": "#047857" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "S&P 500 — 40 year dashboard",
+    "borderTop": true
+  }
+}

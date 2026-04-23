@@ -42,10 +42,14 @@ Get a free API key at [chart-output.com](https://www.chart-output.com/auth/sign-
 
 | Tool | Description |
 |------|-------------|
+| `list_chart_output_examples` | Shipped example spec ids — use before hand-writing `render_card` JSON |
+| `get_chart_example` | Return full `examples/<id>.json` text (valid API body shape) |
 | `render_chart` | Chart.js-style labels/datasets → inline image (optional `extensions` for partial dashboard fields) |
 | `render_chart_url` | Same as `render_chart` → CDN URL instead of bytes |
 | `render_card` | **Full card composition** JSON → inline image (header, KPI strip, footer, theme, `backgroundColor`, etc.); spec is POSTed verbatim to `/api/v1/render` |
 | `render_chart_ai` | Natural language + data → image (Pro/Business key required) |
+
+MCP **resources** also expose the same files as `application/json` at `chart-output://examples/<id>` (e.g. `mrr-breakdown`). Prefer `get_chart_example` or a resource read over guessing the schema.
 
 ## Example
 

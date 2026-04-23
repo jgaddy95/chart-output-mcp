@@ -1,5 +1,21 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+function getExamplesDir() {
+    return join(dirname(fileURLToPath(import.meta.url)), "..", "examples");
+}
+function loadExampleIds() {
+    const dir = getExamplesDir();
+    if (!existsSync(dir)) {
+        return [];
+    }
+    return readdirSync(dir)
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => basename(f, ".json"))
+        .sort();
+}
 // Use www host: apex chart-output.com returns 308 with body "Redirecting..."; clients that
 // don't follow redirects save that text as if it were image bytes.
 const API_BASE = "https://www.chart-output.com";
@@ -125,6 +141,57 @@ async function fetchChartAsBase64(body) {
         mimeType: contentType,
     };
 }
+function registerExampleHelp(server, exampleIds) {
+    const dir = getExamplesDir();
+    for (const id of exampleIds) {
+        const uri = `chart-output://examples/${id}`;
+        const filePath = join(dir, `${id}.json`);
+        server.registerResource(`example-${id}`, uri, {
+            title: `Example: ${id}`,
+            description: `Valid JSON body for render_card / POST /api/v1/render (package file examples/${id}.json). Read this before hand-authoring a card spec to avoid 400s.`,
+            mimeType: "application/json",
+        }, async () => ({
+            contents: [
+                {
+                    uri,
+                    mimeType: "application/json",
+                    text: readFileSync(filePath, "utf8"),
+                },
+            ],
+        }));
+    }
+    const exampleIdHelp = exampleIds.length > 0
+        ? exampleIds.map((id) => `- ${id}`).join("\n")
+        : "(no example files found next to the server; reinstall the package.)";
+    server.tool("list_chart_output_examples", "Lists built-in example chart/card JSON specs shipped with this MCP. Call get_chart_example or resources/read (chart-output://examples/<id>) to fetch a full, API-valid spec before using render_card — this prevents guesswork and 400 errors.", async () => ({
+        content: [
+            {
+                type: "text",
+                text: `Chart-Output example spec ids (use with get_chart_example, or read MCP resource chart-output://examples/<id>):\n${exampleIdHelp}`,
+            },
+        ],
+    }));
+    server.tool("get_chart_example", "Returns the full JSON for a shipped example (same as examples/<id>.json). Pass the parsed object to render_card as { spec: <object> } — the file is already the request body shape the API expects. Use this when render_card returns 400 or you are unsure of field names (header, kpiStrip, data, options, etc.).", {
+        example: z
+            .string()
+            .min(1)
+            .describe('Example id (filename without .json), e.g. "mrr-breakdown". Use list_chart_output_examples to see all ids.'),
+    }, async ({ example }) => {
+        const id = example.trim();
+        if (!exampleIds.includes(id)) {
+            throw new Error(`Unknown example "${id}". Valid ids: ${exampleIds.length ? exampleIds.join(", ") : "none"}. Call list_chart_output_examples.`);
+        }
+        const text = readFileSync(join(dir, `${id}.json`), "utf8");
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `${text}\n\n(Use the JSON object above as render_card’s \`spec\` argument. Adjust labels/values; keep the same top-level field structure your chosen example uses.)`,
+                },
+            ],
+        };
+    });
+}
 function registerTools(server) {
     server.tool("render_chart", "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types. Pass optional extensions for Chart-Output dashboard features (dark background, kpiStrip, header, theme).", {
         type: z
@@ -217,10 +284,10 @@ function registerTools(server) {
             ],
         };
     });
-    server.tool("render_card", "Render a full branded card composition: header (eyebrow, title, subtitle, badge), KPI strip, footer, theme, border, padding, backgroundColor, brandKitId, and chart data/options. Sends the spec verbatim to Chart-Output — use this for production layouts; use render_chart only for simple Chart.js-only payloads. See https://www.chart-output.com/docs/card-composition and examples/*.json in this package.", {
+    server.tool("render_card", "Render a full branded card composition: header (eyebrow, title, subtitle, badge), KPI strip, footer, theme, border, padding, backgroundColor, brandKitId, and chart data/options. Sends the spec verbatim to Chart-Output — use this for production layouts; use render_chart only for simple Chart.js-only payloads. If you get HTTP 400 or are unsure of the schema, do NOT guess: call get_chart_example with example \"mrr-breakdown\" (or list_chart_output_examples) and adapt that JSON. Docs: https://www.chart-output.com/docs/card-composition", {
         spec: z
             .record(z.unknown())
-            .describe("Full card composition JSON for POST /api/v1/render. See https://www.chart-output.com/docs/card-composition (header, kpiStrip, footer, backgroundColor, theme, border, padding, data, options, etc.)."),
+            .describe("Full POST /api/v1/render body. Prefer starting from get_chart_example(\"mrr-breakdown\") and editing values. Fields typically include data, options, and optional header, kpiStrip, footer, theme, width, height, format — exact keys depend on layout (see the example you copy)."),
     }, async ({ spec }) => {
         const body = spec;
         if (body.returnUrl === true) {
@@ -309,12 +376,13 @@ const SERVER_INSTRUCTIONS = `You are using Chart-Output MCP to render charts and
 Authentication: Rendering requires CHART_OUTPUT_API_KEY (Bearer). If calls fail with 401, the user must set the key on the MCP server.
 
 Choose the right tool:
+- list_chart_output_examples / get_chart_example — Use these FIRST when building a full card or you see HTTP 400. They return canonical JSON the API already accepts. Pass the object from get_chart_example to render_card as the "spec" field (edit values only; keep structure). MCP resources: chart-output://examples/<id> (e.g. mrr-breakdown).
 - render_chart — Simple Chart.js charts: chart type, labels, datasets, optional title/size/format. Use optional "extensions" to merge Chart-Output dashboard fields (e.g. backgroundColor, header, footer, kpiStrip, theme) without building a full card by hand.
 - render_chart_url — Same inputs as render_chart but returns a CDN URL instead of image bytes.
-- render_card — Full card composition: pass a single "spec" object that is POSTed verbatim to Chart-Output (header, kpiStrip, footer, theme, brandKitId, data, options, dimensions, format, etc.). Prefer this for production layouts, branding, and complex configs. Do not set returnUrl on the spec (inline image only).
+- render_card — Full card: "spec" is the full POST /api/v1/render body. Do not set returnUrl (inline image only). When unsure, copy from get_chart_example, not from memory.
 - render_chart_ai — Natural-language chart generation; requires a Pro or Business API key.
 
-Authoring JSON: For card-level or complex specs, mirror the shapes in the package examples directory (examples/*.json) and the card composition docs at https://www.chart-output.com/docs/card-composition
+Card layout reference: https://www.chart-output.com/docs/card-composition
 
 Use clear labels and sensible dimensions (defaults are 800×400 unless the design needs otherwise).`;
 let warnedMissingApiKey = false;
@@ -323,10 +391,12 @@ export function createServer() {
         console.error("chart-output-mcp: CHART_OUTPUT_API_KEY is not set. The Chart-Output API requires a key for /api/v1/render (see https://www.chart-output.com/docs/quick-start).");
         warnedMissingApiKey = true;
     }
+    const exampleIds = loadExampleIds();
     const server = new McpServer({
         name: "chart-output-mcp",
-        version: "1.0.3",
+        version: "1.0.5",
     }, { instructions: SERVER_INSTRUCTIONS });
+    registerExampleHelp(server, exampleIds);
     registerTools(server);
     return server;
 }
