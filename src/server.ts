@@ -93,6 +93,40 @@ function buildChartRenderBody(args: {
   return body;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeCardSpec(spec: Record<string, unknown>): Record<string, unknown> {
+  const body: Record<string, unknown> = { ...spec };
+
+  // Common user shape: root labels/datasets from render_chart payload.
+  const labels = Array.isArray(body.labels) ? body.labels : undefined;
+  const datasets = Array.isArray(body.datasets) ? body.datasets : undefined;
+  if (!isRecord(body.data) && labels && datasets) {
+    body.data = { labels, datasets };
+  }
+  delete body.labels;
+  delete body.datasets;
+
+  // render_card returns inline images only.
+  if (body.returnUrl === true) {
+    delete body.returnUrl;
+  }
+
+  // Guard against unsupported header keys that frequently cause API 400s.
+  if (isRecord(body.header)) {
+    const { title, subtitle, badge } = body.header;
+    body.header = {
+      ...(typeof title === "string" ? { title } : {}),
+      ...(typeof subtitle === "string" ? { subtitle } : {}),
+      ...(typeof badge === "string" ? { badge } : {}),
+    };
+  }
+
+  return body;
+}
+
 function assertChartImageBuffer(buffer: Buffer, format: string): void {
   const headUtf8 = buffer.toString("utf8", 0, Math.min(buffer.length, 256)).trimStart();
   if (headUtf8.startsWith("Redirecting")) {
@@ -394,10 +428,31 @@ function registerTools(server: McpServer): void {
           "render_card only returns inline images. Omit returnUrl from the spec for binary responses."
         );
       }
-      const { base64, mimeType } = await fetchChartAsBase64(body);
-      const w = typeof body.width === "number" ? body.width : "?";
-      const h = typeof body.height === "number" ? body.height : "?";
-      const fmt = typeof body.format === "string" ? body.format : "png";
+      let finalBody = body;
+      let normalizedRetry = false;
+      let base64: string;
+      let mimeType: string;
+
+      try {
+        const rendered = await fetchChartAsBase64(finalBody);
+        base64 = rendered.base64;
+        mimeType = rendered.mimeType;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!msg.includes("Chart-Output error 400")) {
+          throw error;
+        }
+
+        finalBody = normalizeCardSpec(body);
+        const rendered = await fetchChartAsBase64(finalBody);
+        base64 = rendered.base64;
+        mimeType = rendered.mimeType;
+        normalizedRetry = true;
+      }
+
+      const w = typeof finalBody.width === "number" ? finalBody.width : "?";
+      const h = typeof finalBody.height === "number" ? finalBody.height : "?";
+      const fmt = typeof finalBody.format === "string" ? finalBody.format : "png";
       return {
         content: [
           {
@@ -407,7 +462,9 @@ function registerTools(server: McpServer): void {
           },
           {
             type: "text" as const,
-            text: `Card rendered successfully (${w}×${h} ${fmt}).`,
+            text: normalizedRetry
+              ? `Card rendered successfully (${w}×${h} ${fmt}) after normalizing common spec fields.`
+              : `Card rendered successfully (${w}×${h} ${fmt}).`,
           },
         ],
       };

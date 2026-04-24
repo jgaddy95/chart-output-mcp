@@ -1,0 +1,91 @@
+{
+  "type": "line",
+  "brandKitId": "obsidian",
+  "width": 1200,
+  "height": 840,
+  "format": "png",
+  "scale": 2,
+  "padding": "email",
+  "backgroundColor": "#0d1117",
+  "borderRadius": 16,
+  "border": { "color": "rgba(255,255,255,0.08)", "width": 1 },
+  "header": {
+    "eyebrow": "CHART-OUTPUT API (HYPOTHETICAL)",
+    "title": "Simulated service performance",
+    "subtitle": "Rolling 12 weeks: render latency and SLA. Illustrative only, not real telemetry",
+    "badge": {
+      "text": "p95 in SLA",
+      "backgroundColor": "rgba(110,231,183,0.12)",
+      "color": "#6ee7b7",
+      "borderRadius": 6
+    }
+  },
+  "legend": {
+    "display": true,
+    "position": "top",
+    "style": "line",
+    "fontSize": 11,
+    "gap": 24
+  },
+  "theme": { "textPrimary": "#f0f6fc", "textSecondary": "#6e7681" },
+  "data": {
+    "labels": ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"],
+    "datasets": [
+      {
+        "label": "p50 latency (ms)",
+        "data": [62, 58, 55, 61, 52, 48, 51, 47, 44, 46, 43, 41],
+        "borderColor": "#58a6ff",
+        "backgroundColor": "rgba(88,166,255,0.08)",
+        "fill": true,
+        "tension": 0.42,
+        "borderWidth": 2.2,
+        "pointRadius": 0
+      },
+      {
+        "label": "p95 latency (ms)",
+        "data": [312, 298, 285, 301, 268, 255, 262, 248, 241, 236, 228, 223],
+        "borderColor": "#a371f7",
+        "backgroundColor": "rgba(163,113,247,0.07)",
+        "fill": true,
+        "tension": 0.38,
+        "borderWidth": 2.2,
+        "pointRadius": 0
+      },
+      {
+        "label": "p95 SLA budget (400ms)",
+        "data": [400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400],
+        "borderColor": "rgba(255,255,255,0.25)",
+        "fill": false,
+        "tension": 0,
+        "borderWidth": 1.5,
+        "borderDash": [6, 4],
+        "pointRadius": 0
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "x": {
+        "grid": { "display": false },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      },
+      "y": {
+        "grid": { "color": "rgba(255,255,255,0.05)" },
+        "border": { "display": false },
+        "ticks": { "color": "#6e7681" }
+      }
+    }
+  },
+  "kpiStrip": [
+    { "label": "p95 (last week)", "value": "223 ms", "color": "#a371f7" },
+    { "label": "Success rate", "value": "99.97%", "color": "#6ee7b7" },
+    { "label": "Charts / day (sim.)", "value": "1.4M", "color": "#f0f6fc" },
+    { "label": "Error budget left", "value": "44%", "color": "#f0f6fc" }
+  ],
+  "footer": {
+    "left": "chart-output.com",
+    "right": "Simulated: example curves, not actual metrics",
+    "borderTop": true
+  }
+}
