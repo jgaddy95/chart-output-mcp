@@ -1,6 +1,6 @@
 # Chart-Output MCP Server
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@chartoutput/mcp)](https://www.npmjs.com/package/@chartoutput/mcp)
 
 Render charts as PNG, SVG, or WebP images directly from Claude, Cursor, 
@@ -86,4 +86,4 @@ Registry listing and quality card:
 - [npm package](https://www.npmjs.com/package/@chartoutput/mcp)
 - [Chart-Output pricing](https://www.chart-output.com/pricing)
 - [Glama MCP listing](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp)
-- [MIT License (text)](https://opensource.org/licenses/MIT) — on GitHub: open the repo → **Add file** → **Create new file** → name it `LICENSE` → use the license template picker, or use the **Community** checklist to add a license
+- [License](LICENSE)
