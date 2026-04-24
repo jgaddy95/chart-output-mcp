@@ -191,7 +191,13 @@ function registerExampleHelp(server, exampleIds) {
     const exampleIdHelp = exampleIds.length > 0
         ? exampleIds.map((id) => `- ${id}`).join("\n")
         : "(no example files found next to the server; reinstall the package.)";
-    server.tool("list_chart_output_examples", "Lists built-in example chart/card JSON specs shipped with this MCP. Call get_chart_example or resources/read (chart-output://examples/<id>) to fetch a full, API-valid spec before using render_card — this prevents guesswork and 400 errors.", async () => ({
+    server.tool("list_chart_output_examples", `Return the ids of all built-in chart/card JSON specs shipped with this MCP package.
+
+Use this tool when: you are about to call render_card and are unsure of the spec shape; you have received a 400 error from render_card; you want to browse available example layouts before choosing one.
+Do NOT skip this step when building full card compositions — guessing field names causes 400 errors.
+
+Returns: a plain-text list of example ids (one per line). Pass any id to get_chart_example to retrieve the full, API-ready JSON body.
+Example invocation: list_chart_output_examples() → ["mrr-breakdown", "weekly-sales-by-plan", ...]`, async () => ({
         content: [
             {
                 type: "text",
@@ -199,11 +205,18 @@ function registerExampleHelp(server, exampleIds) {
             },
         ],
     }));
-    server.tool("get_chart_example", "Returns the full JSON for a shipped example (same as examples/<id>.json). Pass the parsed object to render_card as { spec: <object> } — the file is already the request body shape the API expects. Use this when render_card returns 400 or you are unsure of field names (header, kpiStrip, data, options, etc.).", {
+    server.tool("get_chart_example", `Return the complete JSON body for a named built-in example spec — identical to examples/<id>.json on disk.
+
+Use this tool when: you need a valid API body to start from before calling render_card; render_card returned HTTP 400; you want to verify the exact field names for header, kpiStrip, footer, data, options, or theme.
+Do NOT hand-author a full card spec from memory — always start from this example and edit values only.
+
+Returns: the full JSON text of the example, ready to pass as the \`spec\` argument to render_card. Field structure must be preserved; only values should change.
+Errors: throws if the id is not found — call list_chart_output_examples first to see valid ids.
+Example invocation: get_chart_example({ example: "mrr-breakdown" }) → { type: "bar", data: {...}, header: {...}, ... }`, {
         example: z
             .string()
             .min(1)
-            .describe('Example id (filename without .json), e.g. "mrr-breakdown". Use list_chart_output_examples to see all ids.'),
+            .describe('Id of the example to retrieve (filename without .json extension). Call list_chart_output_examples to see all valid ids. Examples: "mrr-breakdown", "weekly-sales-by-plan", "api-analytics".'),
     }, async ({ example }) => {
         const id = example.trim();
         if (!exampleIds.includes(id)) {
@@ -221,24 +234,66 @@ function registerExampleHelp(server, exampleIds) {
     });
 }
 function registerTools(server) {
-    server.tool("render_chart", "Render a chart from a Chart.js JSON specification. Returns the chart as an inline image. Supports line, bar, pie, doughnut, radar, and polarArea chart types. Pass optional extensions for Chart-Output dashboard features (dark background, kpiStrip, header, theme).", {
+    server.tool("render_chart", `Render a Chart.js-style chart from structured labels and datasets and return it as an inline base64-encoded image.
+
+Use this tool when: you have pre-structured numeric data with explicit labels and datasets; you want a simple chart (line, bar, pie, doughnut, radar, polarArea) returned directly as an image in chat; you want to optionally add Chart-Output dashboard extras (dark background, KPI strip, header, footer) via the extensions field without building a full card spec by hand.
+Do NOT use this tool when: you need a stable URL to embed in HTML or email → use render_chart_url instead; you have raw or natural-language data without structured labels/datasets → use render_chart_ai instead; you need a full branded card with header, footer, KPI strip, and theme → use render_card instead.
+
+Returns: an inline base64 image at the requested dimensions and format, plus a confirmation text string showing actual width×height and format. The image content-type matches the format parameter (image/png by default).
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env and retry. 400 — malformed spec, most often a mismatch between labels length and datasets[].data length, or an unsupported field value. Network error — chart-output.com is unreachable.
+Example: render_chart({ type: "bar", labels: ["Q1","Q2","Q3","Q4"], datasets: [{ label: "Revenue", data: [12000, 15000, 18000, 22000], backgroundColor: "#4F81BD" }], title: "2024 Revenue", width: 800, height: 400 })`, {
         type: z
             .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
-            .describe("Chart type"),
-        labels: z.array(z.string()).describe("X-axis labels or category names"),
+            .describe('Chart type. Use "bar" or "line" for time-series and comparisons. Use "pie" or "doughnut" for proportions (best with ≤7 categories). Use "radar" for multi-axis comparisons across uniform scales. Use "polarArea" for relative magnitude without a common baseline. Example: "bar".'),
+        labels: z
+            .array(z.string())
+            .describe('Category labels or x-axis tick labels. The array length must exactly match the length of every dataset\'s data array. Example: ["Jan", "Feb", "Mar"] or ["Product A", "Product B", "Product C"].'),
         datasets: z
             .array(z.object({
-            label: z.string().optional(),
-            data: z.array(z.number()),
-            backgroundColor: z.union([z.string(), z.array(z.string())]).optional(),
-            borderColor: z.union([z.string(), z.array(z.string())]).optional(),
-            borderRadius: z.number().optional(),
+            label: z
+                .string()
+                .optional()
+                .describe('Series name shown in the chart legend. Example: "Revenue" or "Active Users". Omit for single-series pie/doughnut charts.'),
+            data: z
+                .array(z.number())
+                .describe("Numeric values, one per label entry. Must be the same length as the top-level labels array. Example: [12000, 15000, 18000, 22000]."),
+            backgroundColor: z
+                .union([z.string(), z.array(z.string())])
+                .optional()
+                .describe('Fill color(s). Pass a single CSS color string for bar/line series or an array of colors (one per slice) for pie/doughnut. Accepts hex, rgb(), rgba(), or named colors. Example: "#4F81BD" or ["#FF6384","#36A2EB","#FFCE56"].'),
+            borderColor: z
+                .union([z.string(), z.array(z.string())])
+                .optional()
+                .describe('Border/stroke color(s). Same format as backgroundColor. Commonly used for line charts to set the line color. Example: "#2c5f8a".'),
+            borderRadius: z
+                .number()
+                .optional()
+                .describe("Corner radius in pixels for bar chart bars. Use 4–8 for a modern rounded look. Ignored for non-bar chart types. Example: 6."),
         }))
-            .describe("One or more datasets"),
-        width: z.number().min(100).max(2000).default(800).optional(),
-        height: z.number().min(100).max(2000).default(400).optional(),
-        title: z.string().optional().describe("Chart title"),
-        format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
+            .describe("Array of data series. Each entry represents one line, bar group, or set of slices. Example: [{ label: \"Revenue\", data: [100, 200, 150], backgroundColor: \"#4F81BD\" }]. For pie/doughnut, use one dataset with an array of backgroundColor values."),
+        width: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(800)
+            .optional()
+            .describe("Output image width in pixels. Range: 100–2000. Default: 800. Common values: 400 for thumbnails, 800 for standard dashboards, 1200 for wide/widescreen layouts."),
+        height: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(400)
+            .optional()
+            .describe("Output image height in pixels. Range: 100–2000. Default: 400. Common values: 400 for landscape charts, 500–600 for portrait or square pie charts, 300 for compact sparklines."),
+        title: z
+            .string()
+            .optional()
+            .describe('Optional chart title rendered at the top of the chart. Omit if no title is needed. Example: "Monthly Active Users 2024".'),
+        format: z
+            .enum(["png", "jpeg", "webp", "svg"])
+            .default("png")
+            .optional()
+            .describe('Output image format. "png" (default) — lossless, best for general use and screenshots. "jpeg" — smaller file size, lossy, good for photo-heavy backgrounds. "webp" — modern format, smaller than png with good quality. "svg" — scalable vector, ideal for embedding in web pages where resolution independence matters.'),
         extensions: extensionsSchema,
     }, async ({ type, labels, datasets, width, height, title, format, extensions }) => {
         const body = buildChartRenderBody({
@@ -266,19 +321,60 @@ function registerTools(server) {
             ],
         };
     });
-    server.tool("render_chart_url", "Render a chart and return a CDN URL instead of image bytes. Use this when you need a stable URL to embed in HTML, email, or pass to another tool. Same inputs as render_chart.", {
-        type: z.enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"]),
-        labels: z.array(z.string()),
+    server.tool("render_chart_url", `Render a Chart.js-style chart from structured labels and datasets and return a stable CDN URL string instead of image bytes.
+
+Use this tool when: you need to embed a chart in an HTML page, markdown document, or email via an <img> src attribute; you need to pass a chart URL to another tool or API; you want to avoid sending large base64 image blobs in the conversation.
+Do NOT use this tool when: you want the image displayed inline in chat → use render_chart instead; you have raw or natural-language data → use render_chart_ai instead; you need a full branded card → use render_card instead.
+
+Returns: a plain text string containing a single HTTPS CDN URL pointing to the rendered chart image (e.g. "https://cdn.chart-output.com/..."). The URL is publicly accessible and stable for the lifetime of the render.
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env. 400 — malformed spec, most often a labels/data length mismatch or unsupported field value. Network error — chart-output.com is unreachable.
+Example: render_chart_url({ type: "line", labels: ["Jan","Feb","Mar"], datasets: [{ label: "MAU", data: [12000, 18000, 24000] }], title: "Monthly Active Users" }) → "https://cdn.chart-output.com/abc123.png"`, {
+        type: z
+            .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
+            .describe('Chart type. Use "bar" or "line" for time-series and comparisons. Use "pie" or "doughnut" for proportions (best with ≤7 categories). Use "radar" for multi-axis comparisons. Use "polarArea" for relative magnitude. Example: "line".'),
+        labels: z
+            .array(z.string())
+            .describe('Category labels or x-axis tick labels. Must have the same length as every dataset\'s data array. Example: ["Jan", "Feb", "Mar"] or ["Product A", "Product B"].'),
         datasets: z.array(z.object({
-            label: z.string().optional(),
-            data: z.array(z.number()),
-            backgroundColor: z.union([z.string(), z.array(z.string())]).optional(),
-            borderColor: z.union([z.string(), z.array(z.string())]).optional(),
+            label: z
+                .string()
+                .optional()
+                .describe('Series name shown in the chart legend. Example: "Revenue". Omit for single-series pie/doughnut charts.'),
+            data: z
+                .array(z.number())
+                .describe("Numeric values, one per label. Must be the same length as the top-level labels array. Example: [12000, 15000, 18000]."),
+            backgroundColor: z
+                .union([z.string(), z.array(z.string())])
+                .optional()
+                .describe('Fill color(s). Single CSS color string or array of colors (one per slice for pie/doughnut). Accepts hex, rgb(), rgba(). Example: "#4F81BD" or ["#FF6384","#36A2EB"].'),
+            borderColor: z
+                .union([z.string(), z.array(z.string())])
+                .optional()
+                .describe('Border/stroke color(s). Same format as backgroundColor. Commonly used to set line color for line charts. Example: "#2c5f8a".'),
         })),
-        width: z.number().min(100).max(2000).default(800).optional(),
-        height: z.number().min(100).max(2000).default(400).optional(),
-        title: z.string().optional(),
-        format: z.enum(["png", "jpeg", "webp", "svg"]).default("png").optional(),
+        width: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(800)
+            .optional()
+            .describe("Output image width in pixels. Range: 100–2000. Default: 800. Use 1200 for widescreen, 400 for thumbnail embeds."),
+        height: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(400)
+            .optional()
+            .describe("Output image height in pixels. Range: 100–2000. Default: 400. Use 400 for landscape, 500–600 for square or portrait charts."),
+        title: z
+            .string()
+            .optional()
+            .describe('Optional chart title rendered at the top of the image. Example: "Q1–Q4 Revenue 2024". Omit if untitled.'),
+        format: z
+            .enum(["png", "jpeg", "webp", "svg"])
+            .default("png")
+            .optional()
+            .describe('Output format of the image at the returned URL. "png" (default) — lossless, universally supported. "jpeg" — smaller file, lossy. "webp" — modern, compact. "svg" — scalable vector, ideal for web embeds.'),
         extensions: extensionsSchema,
     }, async ({ type, labels, datasets, width, height, title, format, extensions }) => {
         const body = buildChartRenderBody({
@@ -312,10 +408,20 @@ function registerTools(server) {
             ],
         };
     });
-    server.tool("render_card", "Render a full branded card composition: header (eyebrow, title, subtitle, badge), KPI strip, footer, theme, border, padding, backgroundColor, brandKitId, and chart data/options. Sends the spec verbatim to Chart-Output — use this for production layouts; use render_chart only for simple Chart.js-only payloads. If you get HTTP 400 or are unsure of the schema, do NOT guess: call get_chart_example with example \"mrr-breakdown\" (or list_chart_output_examples) and adapt that JSON. Docs: https://www.chart-output.com/docs/card-composition", {
+    server.tool("render_card", `Render a full branded card composition — header, KPI strip, chart, and footer — and return it as an inline base64-encoded image.
+
+Use this tool when: you need a production-grade dashboard layout with a header (title, subtitle, badge), KPI metric row, themed background, footer, or brand kit; you want to send the full /api/v1/render JSON body verbatim to Chart-Output.
+Do NOT use this tool when: you only need a simple chart without branding → use render_chart instead; you need a URL rather than inline bytes → use render_chart_url instead; you have natural-language data → use render_chart_ai instead.
+
+IMPORTANT — always start from an example spec: call get_chart_example("mrr-breakdown") (or list_chart_output_examples to browse all ids) and modify values only. Do NOT hand-author the full spec from memory; incorrect field names cause HTTP 400.
+
+Returns: an inline base64 image at the format and dimensions defined in the spec, plus a confirmation text string with dimensions and format.
+Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid. returnUrl in spec — not allowed; render_card returns inline images only; omit returnUrl from the spec.
+Limitations: does not support returnUrl; inline image only. For the full field reference see https://www.chart-output.com/docs/card-composition.
+Example: render_card({ spec: { ...get_chart_example("mrr-breakdown"), header: { title: "Q1 Report" } } })`, {
         spec: z
             .record(z.unknown())
-            .describe("Full POST /api/v1/render body. Prefer starting from get_chart_example(\"mrr-breakdown\") and editing values. Fields typically include data, options, and optional header, kpiStrip, footer, theme, width, height, format — exact keys depend on layout (see the example you copy)."),
+            .describe('Full POST /api/v1/render request body. Always start from get_chart_example("mrr-breakdown") or another example id and edit values; do not construct this object from scratch. Typical top-level fields: type, data (with labels and datasets), options, width, height, format, and optional header ({ title, subtitle, badge }), kpiStrip (array of { label, value, delta }), footer ({ text }), theme ("light" | "dark"), backgroundColor, brandKitId. Do NOT include returnUrl — it is not supported by this tool.'),
     }, async ({ spec }) => {
         const body = spec;
         if (body.returnUrl === true) {
@@ -360,19 +466,43 @@ function registerTools(server) {
             ],
         };
     });
-    server.tool("render_chart_ai", "Generate a chart from a natural language description and optional raw data. Chart-Output's AI layer builds the chart spec automatically. Requires a Pro or Business API key.", {
+    server.tool("render_chart_ai", `Generate a chart from a natural language description and optional raw data, and return it as an inline base64-encoded image. Chart-Output's AI layer selects the chart type, builds the spec, and renders automatically.
+
+Use this tool when: you have natural-language data or a plain description without pre-structured labels/datasets; you want Chart-Output to pick the best chart type automatically; you have raw tabular data (JSON array or CSV) and want a chart without manually extracting labels and datasets.
+Do NOT use this tool when: you already have structured labels and datasets → use render_chart or render_chart_url instead; you need SVG output → SVG is not supported by this tool; you need custom Chart.js options or extensions → use render_chart with extensions instead.
+
+Returns: an inline base64 image. The response text reports the AI-selected chart type and generation time in milliseconds.
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid. 403 — the API key is a Free-tier key; this tool requires a Pro or Business key (upgrade at chart-output.com/pricing). 400 — description is empty or data is malformed.
+Limitations: SVG format is not supported (use png, jpeg, or webp). Custom Chart.js options, extensions, headers, and KPI strips are not available — use render_chart or render_card for those. Requires a Pro or Business API key.
+Example: render_chart_ai({ description: "Monthly revenue for 2024 as a green bar chart, growing from 12k in Jan to 28k in Dec", width: 800, height: 400 })`, {
         description: z
             .string()
             .min(1)
             .max(2000)
-            .describe("Natural language description of the chart, e.g. 'Monthly revenue for 2024 growing from 12k to 28k, use a green bar chart'"),
+            .describe('Natural-language description of the desired chart. Be specific about chart type, colors, and key trends for best results. Optionally specify axis labels and units. Examples: "Monthly revenue for 2024 growing from 12k to 28k, use a green bar chart" or "Pie chart of market share: Android 72%, iOS 27%, Other 1%". Max 2000 characters.'),
         data: z
             .union([z.array(z.record(z.unknown())), z.string()])
             .optional()
-            .describe("Optional raw data as a JSON array of objects or CSV string"),
-        width: z.number().min(100).max(2000).default(800).optional(),
-        height: z.number().min(100).max(2000).default(400).optional(),
-        format: z.enum(["png", "jpeg", "webp"]).default("png").optional(),
+            .describe('Optional raw data for the AI to use when building the chart. Accepts either a JSON array of objects (e.g. [{"month":"Jan","revenue":12000},{"month":"Feb","revenue":15000}]) or a CSV string (e.g. "month,revenue\\nJan,12000\\nFeb,15000"). If omitted, the AI generates plausible data from the description alone. Providing real data yields more accurate charts.'),
+        width: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(800)
+            .optional()
+            .describe("Output image width in pixels. Range: 100–2000. Default: 800. Use 1200 for widescreen dashboards, 400 for compact embeds."),
+        height: z
+            .number()
+            .min(100)
+            .max(2000)
+            .default(400)
+            .optional()
+            .describe("Output image height in pixels. Range: 100–2000. Default: 400. Use 400 for landscape, 500–600 for square or portrait layouts."),
+        format: z
+            .enum(["png", "jpeg", "webp"])
+            .default("png")
+            .optional()
+            .describe('Output image format. SVG is NOT supported by this tool. "png" (default) — lossless, best for general use. "jpeg" — smaller file size, lossy. "webp" — modern format with good compression. For SVG output use render_chart instead.'),
     }, async ({ description, data, width, height, format }) => {
         const body = {
             description,
@@ -422,18 +552,17 @@ function registerTools(server) {
 }
 const SERVER_INSTRUCTIONS = `You are using Chart-Output MCP to render charts and dashboard cards as images (PNG, JPEG, WebP, or SVG).
 
-Authentication: Rendering requires CHART_OUTPUT_API_KEY (Bearer). If calls fail with 401, the user must set the key on the MCP server.
+Authentication: All render tools require CHART_OUTPUT_API_KEY (sent as Bearer token). If any call returns 401, the key is missing or invalid — the user must set CHART_OUTPUT_API_KEY in the MCP server environment. render_chart_ai additionally requires a Pro or Business key; a Free key returns 403.
 
-Choose the right tool:
-- list_chart_output_examples / get_chart_example — Use these FIRST when building a full card or you see HTTP 400. They return canonical JSON the API already accepts. Pass the object from get_chart_example to render_card as the "spec" field (edit values only; keep structure). MCP resources: chart-output://examples/<id> (e.g. mrr-breakdown).
-- render_chart — Simple Chart.js charts: chart type, labels, datasets, optional title/size/format. Use optional "extensions" to merge Chart-Output dashboard fields (e.g. backgroundColor, header, footer, kpiStrip, theme) without building a full card by hand.
-- render_chart_url — Same inputs as render_chart but returns a CDN URL instead of image bytes.
-- render_card — Full card: "spec" is the full POST /api/v1/render body. Do not set returnUrl (inline image only). When unsure, copy from get_chart_example, not from memory.
-- render_chart_ai — Natural-language chart generation; requires a Pro or Business API key.
+Tool selection guide:
+1. list_chart_output_examples — call this first when building a card or after receiving HTTP 400, to see all valid example ids.
+2. get_chart_example — call this to retrieve a full, API-valid JSON body for a given example id. Always start render_card from this spec; do not hand-author a card spec.
+3. render_chart — use when you have structured labels + datasets and want an inline image. Supports line, bar, pie, doughnut, radar, polarArea. Use the "extensions" field to add Chart-Output dashboard features (header, footer, kpiStrip, theme, backgroundColor) without a full card spec.
+4. render_chart_url — same inputs as render_chart but returns a CDN URL string instead of image bytes. Use when embedding in HTML, markdown, or email.
+5. render_card — use for full branded dashboard cards (header, KPI strip, footer, theme, brandKitId). The "spec" field is the full POST /api/v1/render body. Do NOT set returnUrl. Always start from get_chart_example output.
+6. render_chart_ai — use when data is in natural language or raw tabular form (JSON array or CSV). Requires Pro/Business key. Does NOT support SVG or custom Chart.js options.
 
-Card layout reference: https://www.chart-output.com/docs/card-composition
-
-Use clear labels and sensible dimensions (defaults are 800×400 unless the design needs otherwise).`;
+Defaults: 800×400 pixels, PNG format. Labels array length must match every dataset's data array length or the API returns 400. Card layout reference: https://www.chart-output.com/docs/card-composition`;
 let warnedMissingApiKey = false;
 export function createServer() {
     if (!apiKey && !warnedMissingApiKey) {

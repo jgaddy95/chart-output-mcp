@@ -1,5 +1,9 @@
 # Chart-Output MCP Server
 
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/@chartoutput/mcp)](https://www.npmjs.com/package/@chartoutput/mcp)
+[![chart-output-mcp MCP server](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp/badges/card.svg)](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp)
+
 Render charts as PNG, SVG, or WebP images directly from Claude, Cursor, 
 Windsurf, or any MCP-compatible AI agent.
 
@@ -74,3 +78,5 @@ Free trial includes 500 renders. No credit card required.
 - [Chart-Output docs](https://www.chart-output.com/docs)
 - [npm package](https://www.npmjs.com/package/@chartoutput/mcp)
 - [Chart-Output pricing](https://www.chart-output.com/pricing)
+- [Glama MCP listing](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp)
+- [License](LICENSE)
