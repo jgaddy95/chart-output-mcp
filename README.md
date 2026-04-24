@@ -2,7 +2,6 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@chartoutput/mcp)](https://www.npmjs.com/package/@chartoutput/mcp)
-[![chart-output-mcp MCP server](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp/badges/card.svg)](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp)
 
 Render charts as PNG, SVG, or WebP images directly from Claude, Cursor, 
 Windsurf, or any MCP-compatible AI agent.
@@ -14,7 +13,9 @@ Chart-Output and returns the image inline.
 
 Ask your AI agent to generate a chart. This is what comes back.
 
-<img src="assets/mrr-breakdown.png" alt="MRR breakdown chart example" width="480" />
+![MRR breakdown chart example](https://raw.githubusercontent.com/jgaddy95/chart-output-mcp/main/assets/mrr-breakdown.png)
+
+(If the image does not load in your viewer, open the [file on GitHub](https://github.com/jgaddy95/chart-output-mcp/blob/main/assets/mrr-breakdown.png).)
 
 ## Examples
 
@@ -72,6 +73,12 @@ the image directly in chat. No code required. Use **`render_card`** for branded 
 3. Add it to your `mcp.json` as shown above
 
 Free trial includes 500 renders. No credit card required.
+
+## Glama
+
+Registry listing and quality card:
+
+[![chart-output-mcp MCP server](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp/badges/card.svg)](https://glama.ai/mcp/servers/jgaddy95/chart-output-mcp)
 
 ## Links
 
