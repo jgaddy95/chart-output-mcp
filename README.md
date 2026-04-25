@@ -52,6 +52,7 @@ Get a free API key at [chart-output.com](https://www.chart-output.com/auth/sign-
 | `render_chart` | Chart.js-style labels/datasets → inline image (optional `extensions` for partial dashboard fields) |
 | `render_chart_url` | Same as `render_chart` → CDN URL instead of bytes |
 | `render_card` | **Full card composition** JSON → inline image (header, KPI strip, footer, theme, `backgroundColor`, etc.); spec is POSTed verbatim to `/api/v1/render` |
+| `render_card_url` | Same full card composition as `render_card` → CDN URL instead of bytes |
 | `render_chart_ai` | Natural language + data → image (Pro/Business key required) |
 
 MCP **resources** also expose the same files as `application/json` at `chart-output://examples/<id>` (e.g. `mrr-breakdown`). Prefer `get_chart_example` or a resource read over guessing the schema.
@@ -64,7 +65,7 @@ Once installed, just ask your AI agent:
 > 12k in January to 28k in December"
 
 The agent calls `render_chart`, `render_card`, or `render_chart_ai` and returns 
-the image directly in chat. No code required. Use **`render_card`** for branded dashboard layouts (dark theme, KPI row, footer).
+the image directly in chat. No code required. Use **`render_card`** for branded dashboard layouts (dark theme, KPI row, footer), or **`render_card_url`** when you need an openable/shareable link.
 
 ## API Key
 

@@ -169,6 +169,26 @@ async function fetchChartAsBase64(body) {
         mimeType: contentType,
     };
 }
+async function fetchChartUrl(body) {
+    const res = await fetch(`${API_BASE}/api/v1/render`, {
+        method: "POST",
+        redirect: "follow",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            ...body,
+            returnUrl: true,
+        }),
+    });
+    if (!res.ok) {
+        const err = (await res.json().catch(() => ({})));
+        throw chartOutputHttpError(res.status, err, res.statusText);
+    }
+    const json = (await res.json());
+    if (typeof json.url !== "string" || !json.url.startsWith("https://")) {
+        throw new Error("Chart-Output did not return a valid HTTPS render URL.");
+    }
+    return json.url;
+}
 function registerExampleHelp(server, exampleIds) {
     const dir = getExamplesDir();
     for (const id of exampleIds) {
@@ -388,22 +408,12 @@ Example: render_chart_url({ type: "line", labels: ["Jan","Feb","Mar"], datasets:
             title,
             returnUrl: true,
         });
-        const res = await fetch(`${API_BASE}/api/v1/render`, {
-            method: "POST",
-            redirect: "follow",
-            headers: authHeaders(),
-            body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-            const err = (await res.json().catch(() => ({})));
-            throw chartOutputHttpError(res.status, err, res.statusText);
-        }
-        const json = (await res.json());
+        const url = await fetchChartUrl(body);
         return {
             content: [
                 {
                     type: "text",
-                    text: `Chart URL: ${json.url}`,
+                    text: `Chart URL: ${url}`,
                 },
             ],
         };
@@ -411,7 +421,7 @@ Example: render_chart_url({ type: "line", labels: ["Jan","Feb","Mar"], datasets:
     server.tool("render_card", `Render a full branded card composition — header, KPI strip, chart, and footer — and return it as an inline base64-encoded image.
 
 Use this tool when: you need a production-grade dashboard layout with a header (title, subtitle, badge), KPI metric row, themed background, footer, or brand kit; you want to send the full /api/v1/render JSON body verbatim to Chart-Output.
-Do NOT use this tool when: you only need a simple chart without branding → use render_chart instead; you need a URL rather than inline bytes → use render_chart_url instead; you have natural-language data → use render_chart_ai instead.
+Do NOT use this tool when: you only need a simple chart without branding → use render_chart instead; you need a URL rather than inline bytes → use render_card_url for full branded cards or render_chart_url for simple charts; you have natural-language data → use render_chart_ai instead.
 
 IMPORTANT — always start from an example spec: call get_chart_example("mrr-breakdown") (or list_chart_output_examples to browse all ids) and modify values only. Do NOT hand-author the full spec from memory; incorrect field names cause HTTP 400.
 
@@ -462,6 +472,47 @@ Example: render_card({ spec: { ...get_chart_example("mrr-breakdown"), header: { 
                     text: normalizedRetry
                         ? `Card rendered successfully (${w}×${h} ${fmt}) after normalizing common spec fields.`
                         : `Card rendered successfully (${w}×${h} ${fmt}).`,
+                },
+            ],
+        };
+    });
+    server.tool("render_card_url", `Render a full branded card composition — header, KPI strip, chart, and footer — and return a stable CDN URL string instead of image bytes.
+
+Use this tool when: you need an openable, shareable, or downloadable URL for a production-grade dashboard layout with a header, KPI metric row, themed background, footer, or brand kit; you want to send the full /api/v1/render JSON body verbatim to Chart-Output.
+Do NOT use this tool when: you want the image displayed inline in chat → use render_card instead; you only need a simple Chart.js labels/datasets chart → use render_chart_url instead; you have natural-language data → use render_chart_ai instead.
+
+IMPORTANT — always start from an example spec: call get_chart_example("mrr-breakdown") (or list_chart_output_examples to browse all ids) and modify values only. Do NOT hand-author the full spec from memory; incorrect field names cause HTTP 400.
+
+Returns: a plain text string containing a single HTTPS CDN URL pointing to the rendered full card image. The URL is publicly accessible and stable for the lifetime of the render.
+Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid.
+Example: render_card_url({ spec: { ...get_chart_example("mrr-breakdown"), header: { title: "Q1 Report" } } }) → "https://cdn.chart-output.com/abc123.png"`, {
+        spec: z
+            .record(z.unknown())
+            .describe('Full POST /api/v1/render request body. Always start from get_chart_example("mrr-breakdown") or another example id and edit values; do not construct this object from scratch. Typical top-level fields: type, data (with labels and datasets), options, width, height, format, and optional header ({ title, subtitle, badge }), kpiStrip (array of { label, value, delta }), footer ({ text }), theme ("light" | "dark"), backgroundColor, brandKitId. returnUrl is handled by this tool automatically.'),
+    }, async ({ spec }) => {
+        const body = spec;
+        let finalBody = body;
+        let normalizedRetry = false;
+        let url;
+        try {
+            url = await fetchChartUrl(finalBody);
+        }
+        catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            if (!msg.includes("Chart-Output error 400")) {
+                throw error;
+            }
+            finalBody = normalizeCardSpec(body);
+            url = await fetchChartUrl(finalBody);
+            normalizedRetry = true;
+        }
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: normalizedRetry
+                        ? `Card URL: ${url}\n\nRendered after normalizing common spec fields.`
+                        : `Card URL: ${url}`,
                 },
             ],
         };
@@ -556,11 +607,12 @@ Authentication: All render tools require CHART_OUTPUT_API_KEY (sent as Bearer to
 
 Tool selection guide:
 1. list_chart_output_examples — call this first when building a card or after receiving HTTP 400, to see all valid example ids.
-2. get_chart_example — call this to retrieve a full, API-valid JSON body for a given example id. Always start render_card from this spec; do not hand-author a card spec.
+2. get_chart_example — call this to retrieve a full, API-valid JSON body for a given example id. Always start render_card or render_card_url from this spec; do not hand-author a card spec.
 3. render_chart — use when you have structured labels + datasets and want an inline image. Supports line, bar, pie, doughnut, radar, polarArea. Use the "extensions" field to add Chart-Output dashboard features (header, footer, kpiStrip, theme, backgroundColor) without a full card spec.
 4. render_chart_url — same inputs as render_chart but returns a CDN URL string instead of image bytes. Use when embedding in HTML, markdown, or email.
-5. render_card — use for full branded dashboard cards (header, KPI strip, footer, theme, brandKitId). The "spec" field is the full POST /api/v1/render body. Do NOT set returnUrl. Always start from get_chart_example output.
-6. render_chart_ai — use when data is in natural language or raw tabular form (JSON array or CSV). Requires Pro/Business key. Does NOT support SVG or custom Chart.js options.
+5. render_card — use for full branded dashboard cards (header, KPI strip, footer, theme, brandKitId) when you want an inline image. The "spec" field is the full POST /api/v1/render body. Do NOT set returnUrl. Always start from get_chart_example output.
+6. render_card_url — use for full branded dashboard cards when you need an openable/shareable CDN URL instead of inline image bytes. The "spec" field is the full POST /api/v1/render body. returnUrl is handled automatically.
+7. render_chart_ai — use when data is in natural language or raw tabular form (JSON array or CSV). Requires Pro/Business key. Does NOT support SVG or custom Chart.js options.
 
 Defaults: 800×400 pixels, PNG format. Labels array length must match every dataset's data array length or the API returns 400. Card layout reference: https://www.chart-output.com/docs/card-composition`;
 let warnedMissingApiKey = false;
