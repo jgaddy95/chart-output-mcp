@@ -69,6 +69,54 @@ function buildChartRenderBody(args) {
 function isRecord(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function normalizeRenderUrl(value) {
+    const url = value.trim();
+    if (url.startsWith("//")) {
+        return `https:${url}`;
+    }
+    if (url.startsWith("/")) {
+        return new URL(url, API_BASE).toString();
+    }
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:") {
+            return parsed.toString();
+        }
+        if (parsed.protocol === "http:" && parsed.hostname.endsWith("chart-output.com")) {
+            parsed.protocol = "https:";
+            return parsed.toString();
+        }
+    }
+    catch {
+        return null;
+    }
+    return null;
+}
+function findRenderUrl(value) {
+    if (typeof value === "string") {
+        return normalizeRenderUrl(value);
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const url = findRenderUrl(item);
+            if (url)
+                return url;
+        }
+    }
+    if (isRecord(value)) {
+        for (const key of ["url", "cdnUrl", "imageUrl", "renderUrl", "href", "src"]) {
+            const url = findRenderUrl(value[key]);
+            if (url)
+                return url;
+        }
+        for (const nested of Object.values(value)) {
+            const url = findRenderUrl(nested);
+            if (url)
+                return url;
+        }
+    }
+    return null;
+}
 function normalizeCardSpec(spec) {
     const body = { ...spec };
     // Common user shape: root labels/datasets from render_chart payload.
@@ -184,10 +232,11 @@ async function fetchChartUrl(body) {
         throw chartOutputHttpError(res.status, err, res.statusText);
     }
     const json = (await res.json());
-    if (typeof json.url !== "string" || !json.url.startsWith("https://")) {
-        throw new Error("Chart-Output did not return a valid HTTPS render URL.");
+    const url = findRenderUrl(json);
+    if (!url) {
+        throw new Error(`Chart-Output did not return a render URL. Response: ${JSON.stringify(json).slice(0, 500)}`);
     }
-    return json.url;
+    return url;
 }
 function registerExampleHelp(server, exampleIds) {
     const dir = getExamplesDir();

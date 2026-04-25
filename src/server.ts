@@ -97,6 +97,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function normalizeRenderUrl(value: string): string | null {
+  const url = value.trim();
+  if (url.startsWith("//")) {
+    return `https:${url}`;
+  }
+  if (url.startsWith("/")) {
+    return new URL(url, API_BASE).toString();
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") {
+      return parsed.toString();
+    }
+    if (parsed.protocol === "http:" && parsed.hostname.endsWith("chart-output.com")) {
+      parsed.protocol = "https:";
+      return parsed.toString();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function findRenderUrl(value: unknown): string | null {
+  if (typeof value === "string") {
+    return normalizeRenderUrl(value);
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = findRenderUrl(item);
+      if (url) return url;
+    }
+  }
+  if (isRecord(value)) {
+    for (const key of ["url", "cdnUrl", "imageUrl", "renderUrl", "href", "src"]) {
+      const url = findRenderUrl(value[key]);
+      if (url) return url;
+    }
+    for (const nested of Object.values(value)) {
+      const url = findRenderUrl(nested);
+      if (url) return url;
+    }
+  }
+
+  return null;
+}
+
 function normalizeCardSpec(spec: Record<string, unknown>): Record<string, unknown> {
   const body: Record<string, unknown> = { ...spec };
 
@@ -238,12 +287,15 @@ async function fetchChartUrl(body: Record<string, unknown>): Promise<string> {
     throw chartOutputHttpError(res.status, err, res.statusText);
   }
 
-  const json = (await res.json()) as { url?: unknown };
-  if (typeof json.url !== "string" || !json.url.startsWith("https://")) {
-    throw new Error("Chart-Output did not return a valid HTTPS render URL.");
+  const json = (await res.json()) as unknown;
+  const url = findRenderUrl(json);
+  if (!url) {
+    throw new Error(
+      `Chart-Output did not return a render URL. Response: ${JSON.stringify(json).slice(0, 500)}`
+    );
   }
 
-  return json.url;
+  return url;
 }
 
 function registerExampleHelp(server: McpServer, exampleIds: string[]): void {
