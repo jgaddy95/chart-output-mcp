@@ -20,6 +20,9 @@ function loadExampleIds() {
 // don't follow redirects save that text as if it were image bytes.
 const API_BASE = "https://www.chart-output.com";
 const apiKey = process.env.CHART_OUTPUT_API_KEY ?? null;
+const REQUEST_TIMEOUT_MS = Number(process.env.CHART_OUTPUT_TIMEOUT_MS ?? 20000);
+const MAX_RETRIES = Number(process.env.CHART_OUTPUT_MAX_RETRIES ?? 2);
+const RETRY_BASE_DELAY_MS = Number(process.env.CHART_OUTPUT_RETRY_BASE_MS ?? 500);
 function authHeaders() {
     const headers = {
         "Content-Type": "application/json",
@@ -34,7 +37,72 @@ function chartOutputHttpError(status, body, statusText) {
     if (status === 401) {
         return new Error(`Chart-Output error 401: ${msg}. Set CHART_OUTPUT_API_KEY to your API key and use Authorization: Bearer (see https://www.chart-output.com/docs/quick-start).`);
     }
+    if (status === 429) {
+        return new Error(`Chart-Output error 429: ${msg}. You are being rate-limited. Retry with backoff and respect Retry-After when provided.`);
+    }
     return new Error(`Chart-Output error ${status}: ${msg}`);
+}
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function isRetryableStatus(status) {
+    return status === 429 || status >= 500;
+}
+function retryAfterMsFromHeader(value) {
+    if (!value)
+        return null;
+    const asSeconds = Number(value);
+    if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+        return asSeconds * 1000;
+    }
+    const parsedDate = Date.parse(value);
+    if (!Number.isNaN(parsedDate)) {
+        const delay = parsedDate - Date.now();
+        return delay > 0 ? delay : 0;
+    }
+    return null;
+}
+function backoffDelayMs(attempt, retryAfterMs) {
+    const expDelay = RETRY_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1);
+    const jitter = Math.floor(Math.random() * 150);
+    const candidate = expDelay + jitter;
+    if (retryAfterMs === null)
+        return candidate;
+    return Math.max(candidate, retryAfterMs);
+}
+async function fetchWithRetry(path, init, options) {
+    const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    const maxRetries = options?.maxRetries ?? MAX_RETRIES;
+    const url = `${API_BASE}${path}`;
+    let lastError = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(new Error("Request timeout")), timeoutMs);
+        try {
+            const res = await fetch(url, {
+                ...init,
+                redirect: "follow",
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            if (attempt < maxRetries && isRetryableStatus(res.status)) {
+                const retryAfter = retryAfterMsFromHeader(res.headers.get("retry-after"));
+                await sleep(backoffDelayMs(attempt + 1, retryAfter));
+                continue;
+            }
+            return res;
+        }
+        catch (error) {
+            clearTimeout(timeout);
+            lastError = error;
+            if (attempt >= maxRetries) {
+                break;
+            }
+            await sleep(backoffDelayMs(attempt + 1, null));
+        }
+    }
+    const errMsg = lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
+    throw new Error(`Chart-Output request failed after retries: ${errMsg}`);
 }
 const extensionsSchema = z
     .record(z.unknown())
@@ -186,9 +254,8 @@ function assertChartImageBuffer(buffer, format) {
 }
 async function fetchChartAsBase64(body) {
     const format = (typeof body.format === "string" ? body.format : "png");
-    const res = await fetch(`${API_BASE}/api/v1/render`, {
+    const res = await fetchWithRetry("/api/v1/render", {
         method: "POST",
-        redirect: "follow",
         headers: authHeaders(),
         body: JSON.stringify(body),
     });
@@ -218,9 +285,8 @@ async function fetchChartAsBase64(body) {
     };
 }
 async function fetchChartUrl(body) {
-    const res = await fetch(`${API_BASE}/api/v1/render`, {
+    const res = await fetchWithRetry("/api/v1/render", {
         method: "POST",
-        redirect: "follow",
         headers: authHeaders(),
         body: JSON.stringify({
             ...body,
@@ -307,9 +373,10 @@ function registerTools(server) {
 
 Use this tool when: you have pre-structured numeric data with explicit labels and datasets; you want a simple chart (line, bar, pie, doughnut, radar, polarArea) returned directly as an image in chat; you want to optionally add Chart-Output dashboard extras (dark background, KPI strip, header, footer) via the extensions field without building a full card spec by hand.
 Do NOT use this tool when: you need a stable URL to embed in HTML or email → use render_chart_url instead; you have raw or natural-language data without structured labels/datasets → use render_chart_ai instead; you need a full branded card with header, footer, KPI strip, and theme → use render_card instead.
+Behavior: this tool makes a remote API call to Chart-Output and may consume render credits.
 
 Returns: an inline base64 image at the requested dimensions and format, plus a confirmation text string showing actual width×height and format. The image content-type matches the format parameter (image/png by default).
-Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env and retry. 400 — malformed spec, most often a mismatch between labels length and datasets[].data length, or an unsupported field value. Network error — chart-output.com is unreachable.
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env and retry. 400 — malformed spec, most often a mismatch between labels length and datasets[].data length, or an unsupported field value. 429 — rate-limited; retry with exponential backoff and honor Retry-After if present. Network error — chart-output.com is unreachable or timed out.
 Example: render_chart({ type: "bar", labels: ["Q1","Q2","Q3","Q4"], datasets: [{ label: "Revenue", data: [12000, 15000, 18000, 22000], backgroundColor: "#4F81BD" }], title: "2024 Revenue", width: 800, height: 400 })`, {
         type: z
             .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
@@ -394,9 +461,10 @@ Example: render_chart({ type: "bar", labels: ["Q1","Q2","Q3","Q4"], datasets: [{
 
 Use this tool when: you need to embed a chart in an HTML page, markdown document, or email via an <img> src attribute; you need to pass a chart URL to another tool or API; you want to avoid sending large base64 image blobs in the conversation.
 Do NOT use this tool when: you want the image displayed inline in chat → use render_chart instead; you have raw or natural-language data → use render_chart_ai instead; you need a full branded card → use render_card instead.
+Behavior: this tool makes a remote API call to Chart-Output, may consume render credits, and returns a publicly accessible CDN URL.
 
 Returns: a plain text string containing a single HTTPS CDN URL pointing to the rendered chart image (e.g. "https://cdn.chart-output.com/..."). The URL is publicly accessible and stable for the lifetime of the render.
-Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env. 400 — malformed spec, most often a labels/data length mismatch or unsupported field value. Network error — chart-output.com is unreachable.
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid; set the key in the MCP server env. 400 — malformed spec, most often a labels/data length mismatch or unsupported field value. 429 — rate-limited; retry with exponential backoff and honor Retry-After if present. Network error — chart-output.com is unreachable or timed out.
 Example: render_chart_url({ type: "line", labels: ["Jan","Feb","Mar"], datasets: [{ label: "MAU", data: [12000, 18000, 24000] }], title: "Monthly Active Users" }) → "https://cdn.chart-output.com/abc123.png"`, {
         type: z
             .enum(["line", "bar", "pie", "doughnut", "radar", "polarArea"])
@@ -471,11 +539,12 @@ Example: render_chart_url({ type: "line", labels: ["Jan","Feb","Mar"], datasets:
 
 Use this tool when: you need a production-grade dashboard layout with a header (title, subtitle, badge), KPI metric row, themed background, footer, or brand kit; you want to send the full /api/v1/render JSON body verbatim to Chart-Output.
 Do NOT use this tool when: you only need a simple chart without branding → use render_chart instead; you need a URL rather than inline bytes → use render_card_url for full branded cards or render_chart_url for simple charts; you have natural-language data → use render_chart_ai instead.
+Behavior: this tool makes a remote API call to Chart-Output and may consume render credits.
 
 IMPORTANT — always start from an example spec: call get_chart_example("mrr-breakdown") (or list_chart_output_examples to browse all ids) and modify values only. Do NOT hand-author the full spec from memory; incorrect field names cause HTTP 400.
 
 Returns: an inline base64 image at the format and dimensions defined in the spec, plus a confirmation text string with dimensions and format.
-Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid. returnUrl in spec — not allowed; render_card returns inline images only; omit returnUrl from the spec.
+Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid. 429 — rate-limited; retry with exponential backoff and honor Retry-After if present. returnUrl in spec — not allowed; render_card returns inline images only; omit returnUrl from the spec.
 Limitations: does not support returnUrl; inline image only. For the full field reference see https://www.chart-output.com/docs/card-composition.
 Example: render_card({ spec: { ...get_chart_example("mrr-breakdown"), header: { title: "Q1 Report" } } })`, {
         spec: z
@@ -529,11 +598,12 @@ Example: render_card({ spec: { ...get_chart_example("mrr-breakdown"), header: { 
 
 Use this tool when: you need an openable, shareable, or downloadable URL for a production-grade dashboard layout with a header, KPI metric row, themed background, footer, or brand kit; you want to send the full /api/v1/render JSON body verbatim to Chart-Output.
 Do NOT use this tool when: you want the image displayed inline in chat → use render_card instead; you only need a simple Chart.js labels/datasets chart → use render_chart_url instead; you have natural-language data → use render_chart_ai instead.
+Behavior: this tool makes a remote API call to Chart-Output, may consume render credits, and returns a publicly accessible CDN URL.
 
 IMPORTANT — always start from an example spec: call get_chart_example("mrr-breakdown") (or list_chart_output_examples to browse all ids) and modify values only. Do NOT hand-author the full spec from memory; incorrect field names cause HTTP 400.
 
 Returns: a plain text string containing a single HTTPS CDN URL pointing to the rendered full card image. The URL is publicly accessible and stable for the lifetime of the render.
-Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid.
+Errors: 400 — malformed or missing required spec fields; the server will auto-retry once after normalizing common structural issues (root labels/datasets → data object). 401 — API key missing or invalid. 429 — rate-limited; retry with exponential backoff and honor Retry-After if present.
 Example: render_card_url({ spec: { ...get_chart_example("mrr-breakdown"), header: { title: "Q1 Report" } } }) → "https://cdn.chart-output.com/abc123.png"`, {
         spec: z
             .record(z.unknown())
@@ -570,9 +640,10 @@ Example: render_card_url({ spec: { ...get_chart_example("mrr-breakdown"), header
 
 Use this tool when: you have natural-language data or a plain description without pre-structured labels/datasets; you want Chart-Output to pick the best chart type automatically; you have raw tabular data (JSON array or CSV) and want a chart without manually extracting labels and datasets.
 Do NOT use this tool when: you already have structured labels and datasets → use render_chart or render_chart_url instead; you need SVG output → SVG is not supported by this tool; you need custom Chart.js options or extensions → use render_chart with extensions instead.
+Behavior: this tool makes a remote API call to Chart-Output's AI endpoint and may consume render credits.
 
 Returns: an inline base64 image. The response text reports the AI-selected chart type and generation time in milliseconds.
-Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid. 403 — the API key is a Free-tier key; this tool requires a Pro or Business key (upgrade at chart-output.com/pricing). 400 — description is empty or data is malformed.
+Errors: 401 — CHART_OUTPUT_API_KEY is missing or invalid. 403 — the API key is a Free-tier key; this tool requires a Pro or Business key (upgrade at chart-output.com/pricing). 400 — description is empty or data is malformed. 429 — rate-limited; retry with exponential backoff and honor Retry-After if present.
 Limitations: SVG format is not supported (use png, jpeg, or webp). Custom Chart.js options, extensions, headers, and KPI strips are not available — use render_chart or render_card for those. Requires a Pro or Business API key.
 Example: render_chart_ai({ description: "Monthly revenue for 2024 as a green bar chart, growing from 12k in Jan to 28k in Dec", width: 800, height: 400 })`, {
         description: z
@@ -612,9 +683,8 @@ Example: render_chart_ai({ description: "Monthly revenue for 2024 as a green bar
         };
         if (data)
             body.data = data;
-        const res = await fetch(`${API_BASE}/api/v1/ai/render`, {
+        const res = await fetchWithRetry("/api/v1/ai/render", {
             method: "POST",
-            redirect: "follow",
             headers: authHeaders(),
             body: JSON.stringify(body),
         });
