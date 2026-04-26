@@ -1,4 +1,5 @@
-import { API_BASE, MAX_RETRIES, REQUEST_TIMEOUT_MS, apiKey } from "../config/chartOutput.js";
+import { API_BASE, MAX_RETRIES, REQUEST_TIMEOUT_MS } from "../config/chartOutput.js";
+import { getChartOutputApiKey } from "../config/requestContext.js";
 import { assertChartImageBuffer } from "../utils/image.js";
 import { backoffDelayMs, isRetryableStatus, retryAfterMsFromHeader, sleep } from "../utils/retry.js";
 import { findRenderUrl } from "../utils/url.js";
@@ -7,8 +8,9 @@ export function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+  const key = getChartOutputApiKey();
+  if (key) {
+    headers["Authorization"] = `Bearer ${key}`;
   }
   return headers;
 }

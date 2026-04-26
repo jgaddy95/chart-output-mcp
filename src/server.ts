@@ -6,8 +6,12 @@ import { registerTools } from "./tools/index.js";
 
 let warnedMissingApiKey = false;
 
-export function createServer(): McpServer {
-  if (!apiKey && !warnedMissingApiKey) {
+type CreateServerOptions = {
+  hasRequestScopedApiKey?: boolean;
+};
+
+export function createServer(options: CreateServerOptions = {}): McpServer {
+  if (!apiKey && !options.hasRequestScopedApiKey && !warnedMissingApiKey) {
     console.error(
       "chart-output-mcp: CHART_OUTPUT_API_KEY is not set. The Chart-Output API requires a key for /api/v1/render (see https://www.chart-output.com/docs/quick-start)."
     );
